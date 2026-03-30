@@ -1,5 +1,9 @@
 # Code Compiler
 
+**Languages:** [Portuguese](README.md) | [English](README.en.md)
+
+---
+
 Este projeto é uma implementação de um compilador simplificado da linguagem C, desenvolvido com o objetivo de estudo de um pipeline de um compilador convencional.
 
 ---
