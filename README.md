@@ -52,7 +52,7 @@ Code-Compiler/
 
 A documentação detalhada de cada etapa do compilador está disponível na pasta `docs/`:
 
-* [Scanner (Analisador Léxico)](docs/scanner.md)
+* [Scanner (Analisador Léxico)](Docs/scanner.md)
 
 ---
 
