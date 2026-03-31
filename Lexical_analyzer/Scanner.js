@@ -1,4 +1,4 @@
-import { tokenSpecs, Token } from "./Token.js";
+import { tokenType, tokenSpecs, Token } from "./Token.js";
 
 export class Scanner{
     constructor(input){
@@ -6,35 +6,93 @@ export class Scanner{
         this.cursor = 0;
         this.line = 1;
         this.column = 1;
+        this.errors = [];
     }
 
     nextToken(){
         if(this.cursor >= this.input.length) return null;
 
-        const string = this.input.slice(this.cursor); // Slice input based on cursor position
+        while(true){
+            const string = this.input.slice(this.cursor); // Slice input based on cursor position
+            let matched = false;
+
+            for(const [regex, type] of tokenSpecs){
+                if(type != null) continue;
+
+                const match = regex.exec(string);
+
+                if(match){
+                    this.advance(match[0]);
+                    matched = true;
+                    break;
+                }
+            }
+
+            if(!matched) break;
+        }
+
+        if(this.cursor >= this.input.length) return null;
+
+        const { lexeme, line, column } = this.getNextLexeme();
 
         for(const [regex, type] of tokenSpecs){
-            const match = regex.exec(string); // Apply RegEx rules
+            if(type === null) continue;
 
-            if(match){
-                const token = match[0];
+            const match = regex.exec(lexeme);
 
-                // Save current token position
-                const tokenLine = this.line;
-                const tokenColumn = this.column;
-
-                // Move the cursor and update row and column
-                this.advance(token);
-
-                if(type === null){
-                    return this.nextToken(); // Ignore and goes to next token
-                }
-
-                return new Token(type, token, tokenLine, tokenColumn); // Output
+            if (match && match[0] === lexeme) {
+                return new Token(type, lexeme, line, column);
             }
         }
 
-        throw new Error(`Invalid token: '${string[0]}' on row ${this.line}, column ${this.column}`);
+        this.errors.push({message: `Invalid token '${lexeme}'`, line, column});
+
+        return new Token(tokenType.ERROR , lexeme, line, column);
+    }
+
+    getNextLexeme(){
+        let lexeme = "";
+        let startLine = this.line;
+        let startColumn = this.column;
+        
+        while(this.cursor < this.input.length){
+            const char = this.input[this.cursor];
+            
+            // Stop when delimiter found
+            if(/\s/.test(char) || /[\(\)\{\}\[\];,]/.test(char)){
+                break;
+            }
+
+            // Stop when operators found
+            if(/[=\+\-\*\/<>!]/.test(char)){
+                if(lexeme.length === 0){
+                    lexeme += char;
+                    this.advance(char);
+                    
+                    // Test double operator
+                    const next = this.input[this.cursor];
+                    if(next && /[=]/.test(next)){
+                        lexeme += next;
+                        this.advance(next);
+                    }
+                    
+                    return { lexeme, line: startLine, column: startColumn };
+                }
+
+                break;
+            } 
+            
+            lexeme += char;
+            this.advance(char);
+        }
+        
+        // Ensures that at least one character is read
+        if(lexeme.length === 0){
+            lexeme = this.input[this.cursor];
+            this.advance(lexeme);
+        }
+
+        return { lexeme, line: startLine, column: startColumn };
     }
 
     advance(token){

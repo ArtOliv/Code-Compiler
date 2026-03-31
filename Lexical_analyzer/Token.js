@@ -1,4 +1,4 @@
-const tokenType = {
+export const tokenType = {
     KEYWORD: "KEYWORD",
     IDENTIFIER: "IDENTIFIER",
     LITER_INT: "LITER_INT",
@@ -9,6 +9,7 @@ const tokenType = {
     OP_RELATIONAL: "OP_RELATIONAL",
     OP_ARITHMETIC: "OP_ARITHMETIC",
     DELIMITER: "DELIMITER",
+    ERROR: "ERROR",
 };
 
 export const tokenSpecs = [
