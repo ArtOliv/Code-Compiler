@@ -48,7 +48,7 @@ O lexer percorre o código caractere por caractere utilizando:
 Se nenhum padrão casar com o caracter atual, permite mensagens de erro como:
 
 ```
-Invalid token '@' at line 1, column 10
+Token { type: 'ERROR', value: '@', line: 1, column: 12 }
 ```
 
 ---
@@ -129,9 +129,10 @@ node index.js program.c
 Saída esperada no terminal:
 
 ```
-{ type: 'INT', value: 'int', line: 1, column: 1 } 
-{ type: 'IDENTIFIER', value: 'x', line: 1, column: 5 } 
-{ type: 'OP_ASSIGNMENT', value: '=', line: 1, column: 7 } 
-{ type: 'LITER_INT', value: '10', line: 1, column: 9 } 
-{ type: 'DELIMITER', value: ';', line: 1, column: 11 }
+Token { type: 'INT', value: 'int', line: 1, column: 1 } 
+Token { type: 'IDENTIFIER', value: 'x', line: 1, column: 5 } 
+Token { type: 'OP_ASSIGNMENT', value: '=', line: 1, column: 7 } 
+Token { type: 'LITER_INT', value: '10', line: 1, column: 9 } 
+Token { type: 'ERROR', value: '@', line: 1, column: 12 }
+Token { type: 'DELIMITER', value: ';', line: 1, column: 13 }
 ```
