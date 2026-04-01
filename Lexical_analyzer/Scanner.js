@@ -10,18 +10,19 @@ export class Scanner{
     }
 
     nextToken(){
-        if(this.cursor >= this.input.length) return null;
+        if(this.cursor >= this.input.length) return null; // Return if EOF
 
+        // Move cursor when whitespaces found
         while(true){
             const string = this.input.slice(this.cursor); // Slice input based on cursor position
             let matched = false;
 
             for(const [regex, type] of tokenSpecs){
-                if(type != null) continue;
+                if(type != null) continue; // Continue if valid token
 
-                const match = regex.exec(string);
+                const match = regex.exec(string); // Apply RegEx rules
 
-                if(match){
+                if(match){ // If matched move cursor and end loop
                     this.advance(match[0]);
                     matched = true;
                     break;
@@ -31,23 +32,24 @@ export class Scanner{
             if(!matched) break;
         }
 
-        if(this.cursor >= this.input.length) return null;
+        if(this.cursor >= this.input.length) return null; // Return if EOF
 
-        const { lexeme, line, column } = this.getNextLexeme();
+        const { lexeme, line, column } = this.getNextLexeme(); // Get full lexeme
 
+        // When lexeme has no error return token
         for(const [regex, type] of tokenSpecs){
-            if(type === null) continue;
+            if(type === null) continue; // Continue if invalid token
 
-            const match = regex.exec(lexeme);
+            const match = regex.exec(lexeme); // Apply RegEx rules
 
-            if (match && match[0] === lexeme) {
+            if(match && match[0] === lexeme){ // If lexeme with no error, return token
                 return new Token(type, lexeme, line, column);
             }
         }
 
         this.errors.push({message: `Invalid token '${lexeme}'`, line, column});
 
-        return new Token(tokenType.ERROR , lexeme, line, column);
+        return new Token(tokenType.ERROR , lexeme, line, column); // Return error
     }
 
     getNextLexeme(){
