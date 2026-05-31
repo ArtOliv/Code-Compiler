@@ -39,7 +39,7 @@ Code-Compiler/
 │   ├── Scanner.js
 │   └── Token.js
 ├── Docs/
-│   └── lexer.md
+│   └── scanner.md
 ├── index.js
 ├── program.c
 ├── Makefile

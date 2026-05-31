@@ -7,5 +7,6 @@ int main(){
     /* Teste */
     if(num == 10){
         num = 10 + 1;
+        num = num + 10;
     }
 }

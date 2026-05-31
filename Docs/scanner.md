@@ -72,8 +72,6 @@ Token { type: 'ERROR', value: '@', line: 1, column: 12 }
 int, float, char, if, else, while, for, return, void
 ```
 
-
-
 ### Identificadores
 
 ```regex
@@ -119,10 +117,6 @@ cd Code-Compiler
 Altere o arquivo `program.c` como desejar e execute:
 
 ```bash
-# Com Makefile
-make run
-
-# Ou pelo comando
 node index.js program.c 
 ```
 

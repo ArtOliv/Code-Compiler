@@ -7,10 +7,19 @@ export class Scanner{
         this.line = 1;
         this.column = 1;
         this.errors = [];
+        this.eofReturned = false;
     }
 
     nextToken(){
-        if(this.cursor >= this.input.length) return null; // Return if EOF
+        if(this.cursor >= this.input.length){
+            if(this.eofReturned){
+                return null;
+            }
+
+            this.eofReturned = true;
+
+            return new Token(tokenType.EOF, "EOF", this.line, this.column); // Return if EOF
+        } 
 
         // Move cursor when whitespaces found
         while(true){
@@ -18,7 +27,7 @@ export class Scanner{
             let matched = false;
 
             for(const [regex, type] of tokenSpecs){
-                if(type != null) continue; // Continue if valid token
+                if(type !== null) continue; // Continue if valid token
 
                 const match = regex.exec(string); // Apply RegEx rules
 
@@ -32,13 +41,21 @@ export class Scanner{
             if(!matched) break;
         }
 
-        if(this.cursor >= this.input.length) return null; // Return if EOF
+        if(this.cursor >= this.input.length){
+            if(this.eofReturned){
+                return null;
+            }
+
+            this.eofReturned = true;
+
+            return new Token(tokenType.EOF, "EOF", this.line, this.column); // Return if EOF
+        }
 
         const { lexeme, line, column } = this.getNextLexeme(); // Get full lexeme
 
         // When lexeme has no error return token
         for(const [regex, type] of tokenSpecs){
-            if(type === null) continue; // Continue if invalid token
+            if(type === null) continue; // Ignore whitespaces/comments
 
             const match = regex.exec(lexeme); // Apply RegEx rules
 
@@ -47,7 +64,7 @@ export class Scanner{
             }
         }
 
-        this.errors.push({message: `Invalid token '${lexeme}'`, line, column});
+        this.errors.push({type: "LEXICAL_ERROR", lexeme, line, column, message: `Invalid token '${lexeme}'`});
 
         return new Token(tokenType.ERROR , lexeme, line, column); // Return error
     }
@@ -73,7 +90,7 @@ export class Scanner{
                     
                     // Test double operator
                     const next = this.input[this.cursor];
-                    if(next && /[=]/.test(next)){
+                    if(next === "=" && (char === "=" || char === "!" || char === "<" || char === ">")){
                         lexeme += next;
                         this.advance(next);
                     }

@@ -133,10 +133,6 @@ cd Code-Compiler
 Modify the `program.c` file as desired and run:
 
 ```bash
-# Using Makefile
-make run
-
-# Or directly
 node index.js program.c 
 ```
 

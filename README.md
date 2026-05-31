@@ -38,11 +38,15 @@ Code-Compiler/
 ├── Lexical_analyzer/
 │   ├── Scanner.js
 │   └── Token.js
+├── Syntactic_analyzer/
+│   ├── Parser.js
+│   ├── Printer.js
+│   └── Node.js
 ├── Docs/
-│   └── lexer.md
+│   ├── parser.js
+│   └── scanner.md
 ├── index.js
 ├── program.c
-├── Makefile
 └── README.md
 ```
 
@@ -53,6 +57,7 @@ Code-Compiler/
 A documentação detalhada de cada etapa do compilador está disponível na pasta `Docs/`:
 
 * [Scanner (Analisador Léxico)](Docs/scanner.md)
+* [Parser (Analisador Sintático)](Docs/parser.md)
 
 ---
 

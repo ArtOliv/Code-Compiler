@@ -1,15 +1,55 @@
 export const tokenType = {
-    KEYWORD: "KEYWORD",
+    // Keywords
+    INT: "INT",
+    FLOAT: "FLOAT",
+    CHAR: "CHAR",
+    IF: "IF",
+    ELSE: "ELSE",
+    WHILE: "WHILE",
+    FOR: "FOR",
+    RETURN: "RETURN",
+
+    // Identifier
     IDENTIFIER: "IDENTIFIER",
+
+    // Literals
     LITER_INT: "LITER_INT",
     LITER_FLOAT: "LITER_FLOAT",
     LITER_STRING: "LITER_STRING",
     LITER_CHAR: "LITER_CHAR",
-    OP_ASSIGNMENT: "OP_ASSIGNMENT",
-    OP_RELATIONAL: "OP_RELATIONAL",
-    OP_ARITHMETIC: "OP_ARITHMETIC",
-    DELIMITER: "DELIMITER",
+
+    // Assignment
+    ASSIGN: "ASSIGN",
+
+    // Relational operators
+    EQ: "EQ",
+    NE: "NE",
+    LT: "LT",
+    GT: "GT",
+    LE: "LE",
+    GE: "GE",
+
+    // Arithmetic operators
+    PLUS: "PLUS",
+    MINUS: "MINUS",
+    MULT: "MULT",
+    DIV: "DIV",
+
+    // Delimiters
+    LPAREN: "LPAREN",
+    RPAREN: "RPAREN",
+    LBRACE: "LBRACE",
+    RBRACE: "RBRACE",
+    LBRACKET: "LBRACKET",
+    RBRACKET: "RBRACKET",
+    SEMICOLON: "SEMICOLON",
+    COMMA: "COMMA",
+
+    // Error
     ERROR: "ERROR",
+
+    // End of File
+    EOF: "EOF",
 };
 
 export const tokenSpecs = [
@@ -18,8 +58,17 @@ export const tokenSpecs = [
     [/^\/\/.*/, null], // Comments
     [/^\/\*[\s\S]*?\*\//, null], // Block comments
 
-    // Keywords and Identifiers
-    [/^\b(int|float|char|if|else|while|for|return|void)\b/, tokenType.KEYWORD],
+    // Keywords
+    [/^int\b/, tokenType.INT],
+    [/^float\b/, tokenType.FLOAT],
+    [/^char\b/, tokenType.CHAR],
+    [/^if\b/, tokenType.IF],
+    [/^else\b/, tokenType.ELSE],
+    [/^while\b/, tokenType.WHILE],
+    [/^for\b/, tokenType.FOR],
+    [/^return\b/, tokenType.RETURN],
+    
+    // Identifier
     [/^[a-zA-Z_][a-zA-Z0-9_]*/, tokenType.IDENTIFIER],
 
     // Literals
@@ -28,13 +77,32 @@ export const tokenSpecs = [
     [/^"(?:[^"\\]|\\.)*"/, tokenType.LITER_STRING],
     [/^'(?:[^\\']|\\.)'/, tokenType.LITER_CHAR],
 
-    // Operators
-    [/^(==|!=|<=|>=|<|>)/, tokenType.OP_RELATIONAL],
-    [/^(=)/, tokenType.OP_ASSIGNMENT],
-    [/^(\+|-|\*|\/)/, tokenType.OP_ARITHMETIC],
+    // Relational operators
+    [/^==/, tokenType.EQ],
+    [/^!=/, tokenType.NE],
+    [/^<=/, tokenType.LE],
+    [/^>=/, tokenType.GE],
+    [/^</, tokenType.LT],
+    [/^>/, tokenType.GT],
+
+    // Assignment
+    [/^(=)/, tokenType.ASSIGN],
+
+    // Arithmetic operators
+    [/^\+/, tokenType.PLUS],
+    [/^-/, tokenType.MINUS],
+    [/^\*/, tokenType.MULT],
+    [/^\//, tokenType.DIV],
 
     // Delimiters
-    [/^(\(|\)|\{|\}|\[|\]|;|,)/, tokenType.DELIMITER],
+    [/^\(/, tokenType.LPAREN],
+    [/^\)/, tokenType.RPAREN],
+    [/^\{/, tokenType.LBRACE],
+    [/^\}/, tokenType.RBRACE],
+    [/^\[/, tokenType.LBRACKET],
+    [/^\]/, tokenType.RBRACKET],
+    [/^;/, tokenType.SEMICOLON],
+    [/^,/, tokenType.COMMA],
 ];
 
 export class Token{
