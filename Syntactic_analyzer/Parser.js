@@ -1,11 +1,15 @@
 import { tokenType } from "../Lexical_analyzer/Token.js";
 import { Node } from "./Node.js";
+import { SymbolTable } from "../Semantic_analyzer/SymbolTable.js";
 
 export class Parser{
     constructor(tokens){
         this.tokens = tokens;
         this.current = 0;
         this.errors = [];
+        this.symbolTable = new SymbolTable();
+        this.semanticErrors = [];
+        this.warnings = [];
     }
 
     // Auxiliary Methods
@@ -68,6 +72,35 @@ export class Parser{
         return this.peek().type === tokenType.EOF;
     }
 
+    checkTypeCompatibility(expected, actual, line, column) {
+        if(expected === "error" || actual === "error") return;
+        if(expected === actual) return;
+        if(expected === "float" && actual === "int") return;
+        
+        this.semanticErrors.push(`Semantic Error (Line ${line}, Column ${column}): Incompatible types. Cannot assign '${actual}' to '${expected}'.`);
+    }
+
+    checkOperationCompatibility(leftType, rightType, operator, line, column) {
+        if(leftType === "error" || rightType === "error") return "error";
+        
+        if(leftType === "string" || rightType === "string" || leftType === "char" || rightType === "char"){
+            this.semanticErrors.push(`Semantic Error (Line ${line}, Column ${column}): Operator '${operator}' cannot be applied to types '${leftType}' and '${rightType}'.`);
+            return "error";
+        }
+
+        if(leftType === "float" || rightType === "float") return "float";
+        
+        return "int";
+    }
+
+    checkUnusedVariables(scope) {
+        for(const [name, info] of scope.entries()){
+            if(!info.used) {
+                this.warnings.push(`Warning (Line ${info.line}): Variable '${name}' was declared but never used.`);
+            }
+        }
+    }
+
     // Grammar Rules
     parse(){
         try{
@@ -76,6 +109,8 @@ export class Parser{
             if(!this.isAtEOF()){
                 throw new Error(`Unexpected token '${this.peek().value}' at EOF, line ${this.peek().line}`);
             }
+
+            this.checkUnusedVariables(this.symbolTable.exitScope()); // Check unused variables on global scope
 
             return ast;
         } catch(error){
@@ -115,6 +150,7 @@ export class Parser{
     block(){
         const node = new Node("Block");
         this.consume(tokenType.LBRACE, "Expected '{'");
+        this.symbolTable.enterScope(); // Semantic: enter new scope
 
         while(!this.check(tokenType.RBRACE) && !this.isAtEOF()){
             try{
@@ -126,6 +162,9 @@ export class Parser{
         }
 
         this.consume(tokenType.RBRACE, "Expected '}'");
+
+        const removedScope = this.symbolTable.exitScope(); //Semantic: exit scope
+        this.checkUnusedVariables(removedScope); // Semantic: check warnings
 
         return node;
     }
@@ -157,18 +196,33 @@ export class Parser{
 
     declaration(){
         const typeToken = this.advance(); // Catch type (int, float, char)
-        const node = new Node("Declaration");
+        const declaredType = typeToken.value;
+        const node = new Node("Declaration", null, declaredType);
         node.addChild(new Node("Type", typeToken.value))
 
         do{
             const idToken = this.consume(tokenType.IDENTIFIER, "Expected identifier");
-            const varNode = new Node("Variable", idToken.value);
+            const varNode = new Node("Variable", idToken.value, declaredType);
+
+            // Semantic: register variable on symbol table
+            if(!this.symbolTable.declare(idToken.value, declaredType, idToken.line, idToken.column)){
+                this.semanticErrors.push(`Semantic Error (Line ${idToken.line}, Column ${idToken.column}): Redeclaration of variable '${idToken.value}'.`);
+            }
 
             // Check if there is declaration on the assingment
             if(this.match(tokenType.ASSIGN)){
+                // Semantic: variable assigned with value, then initialized
+                this.symbolTable.markInitialized(idToken.value);
+
                 const assignNode = new Node("Assignment", "=");
-                assignNode.addChild(new Node("Identifier", idToken.value));
-                assignNode.addChild(this.relationalExpression());
+                assignNode.addChild(new Node("Identifier", idToken.value, declaredType));
+                
+                const exprNode = this.relationalExpression();
+                assignNode.addChild(exprNode);
+
+                // Semantic: check type conpatibility
+                this.checkTypeCompatibility(declaredType, exprNode.evalType, idToken.line, idToken.column);
+
                 varNode.addChild(assignNode);
             }
 
@@ -180,11 +234,28 @@ export class Parser{
 
     assignment(){
         const idToken = this.consume(tokenType.IDENTIFIER, "Expected identifier");
+
+        // Semantic: check if variable exists
+        const symbol = this.symbolTable.lookup(idToken.value);
+        let expectedType = "error";
+
+        if(!symbol){
+            this.semanticErrors.push(`Semantic Error (Line ${idToken.line}, Column ${idToken.column}): Undeclared variable '${idToken.value}'.`);
+        } else {
+            this.symbolTable.markInitialized(idToken.value);
+            expectedType = symbol.type;
+        }
+
         this.consume(tokenType.ASSIGN, "Expected '='");
         
         const node = new Node("Assignment", "=");
-        node.addChild(new Node("Identifier", idToken.value));
-        node.addChild(this.relationalExpression());
+        node.addChild(new Node("Identifier", idToken.value, expectedType));
+
+        const exprNode = this.relationalExpression();
+        node.addChild(exprNode);
+        
+        // Semantic: check type conpatibility on assigment
+        this.checkTypeCompatibility(expectedType, exprNode.evalType, idToken.line, idToken.column);
 
         return node;
     }
@@ -221,6 +292,8 @@ export class Parser{
 
     forStatement(){
         const node = new Node("forCommand");
+        this.symbolTable.enterScope(); // Semantic: statement for has its own scope
+
         this.consume(tokenType.LPAREN, "Expected '('");
 
         // Inicialization
@@ -253,6 +326,10 @@ export class Parser{
         }
 
         node.addChild(this.block());
+
+        const removedScope = this.symbolTable.exitScope(); //Semantic: exit scope
+        this.checkUnusedVariables(removedScope); // Semantic: check warnings
+
         return node;
     }
 
@@ -270,9 +347,16 @@ export class Parser{
 
         if(this.check(tokenType.EQ) || this.check(tokenType.NE) || this.check(tokenType.LT) || this.check(tokenType.GT) || this.check(tokenType.LE) || this.check(tokenType.GE)){
             const operator = this.advance();
-            const node = new Node("RalationalOperation", operator.value);
+            const right = this.arithmeticExpression();
+
+            const node = new Node("RalationalOperation", operator.value, "int");
+
+            // Semantic: check operation compatibility 
+            this.checkOperationCompatibility(left.evalType, right.evalType, operator.value, operator.line, operator.column);
+
             node.addChild(left);
-            node.addChild(this.arithmeticExpression());
+            node.addChild(right);
+
             return node;
         }
 
@@ -284,9 +368,15 @@ export class Parser{
 
         while(this.check(tokenType.PLUS) || this.check(tokenType.MINUS)){
             const operator = this.advance();
-            const node = new Node("ArithmeticOperation", operator.value);
+            const right = this.term();
+
+            // Semantic: type synthesis 
+            const resultingType = this.checkOperationCompatibility(left.evalType, right.evalType, operator.value, operator.line, operator.column);
+            
+            const node = new Node("ArithmeticOperation", operator.value, resultingType);
+            
             node.addChild(left);
-            node.addChild(this.term());
+            node.addChild(right);
             left = node;
         }
 
@@ -298,9 +388,15 @@ export class Parser{
 
         while(this.check(tokenType.MULT) || this.check(tokenType.DIV)){
             const operator = this.advance();
-            const node = new Node("ArithmeticOperation", operator.value);
+            const right = this.factor();
+
+            // Semantic: type synthesis
+            const resultingType = this.checkOperationCompatibility(left.evalType, right.evalType, operator.value, operator.line, operator.column);
+
+            const node = new Node("ArithmeticOperation", operator.value, resultingType);
+
             node.addChild(left);
-            node.addChild(this.factor());
+            node.addChild(right);
             left = node;
         }
 
@@ -315,13 +411,30 @@ export class Parser{
         }
 
         if(this.check(tokenType.IDENTIFIER)){
-            return new Node("Identifier", this.advance().value);
+            const token = this.advance();
+            
+            // Semantic: check if variable exists
+            const symbol = this.symbolTable.lookup(token.value);
+            if(!symbol){
+                this.semanticErrors.push(`Semantic Error (Line ${token.line}, Column ${token.column}): Undeclared variable '${token.value}' used in expression.`);
+                return new Node("Identifier", token.value, "error");
+            }
+            
+            this.symbolTable.markUsed(token.value);
+
+            // Semantic: check if variable has any value
+            if(!symbol.isInitialized){
+                this.warnings.push(`Warning (Line ${token.line}, Column ${token.column}): Variable '${token.value}' is used uninitialized.`);
+            }
+
+            return new Node("Identifier", token.value, symbol.type);
         }
 
-        if(this.check(tokenType.LITER_INT) || this.check(tokenType.LITER_FLOAT) || this.check(tokenType.LITER_CHAR) || this.check(tokenType.LITER_STRING)){
-            const token = this.advance();
-            return new Node("Literal", token.value);
-        }
+        // Semantic: define literal type based on token
+        if(this.check(tokenType.LITER_INT)) return new Node("Literal", this.advance().value, "int");
+        if(this.check(tokenType.LITER_FLOAT)) return new Node("Literal", this.advance().value, "float");
+        if(this.check(tokenType.LITER_CHAR)) return new Node("Literal", this.advance().value, "char");
+        if(this.check(tokenType.LITER_STRING)) return new Node("Literal", this.advance().value, "string");
 
         const token = this.peek();
         throw new Error(`Expected expression '${token.value}' at line ${token.line}`);

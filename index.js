@@ -47,5 +47,30 @@ if(parser.errors.length > 0){
     process.exit(1);
 }
 
-console.log("\n===== Syntactic Tree =====\n")
+// Semantic analysis
+console.log("\n====== Semantic Analysis ======\n");
+
+if(parser.warnings.length > 0){
+    console.log("Warnings:");
+
+    for(const warning of parser.warnings){
+        console.log(`\x1b[33m- ${warning}\x1b[0m`);
+    }
+
+    console.log("");
+}
+
+if(parser.semanticErrors.length > 0){
+    console.error("Semantic Errors found:");
+
+    for(const error of parser.semanticErrors){
+        console.error(`\x1b[31m- ${error}\x1b[0m`);
+    }
+
+    process.exit(1);
+} else {
+    console.log("Code is semantically correct!");
+}
+
+console.log("\n====== Syntactic Tree ======\n")
 Printer.print(ast);
