@@ -1,6 +1,7 @@
 export class SymbolTable{
     constructor(){
         this.scopes = [new Map()]; // Scope stack
+        this.allSymbols = []; // Symbols history
     }
 
     enterScope(){
@@ -17,8 +18,20 @@ export class SymbolTable{
         if(currentScope.has(name)){
             return false; // Variable declared already
         }
+
+        const symbolInfo = {
+            name: name,
+            type: type,
+            scopeLevel: this.scopes.length - 1,
+            line: line,
+            column: column,
+            used: false,
+            isInitialized: false
+        }
         
-        currentScope.set(name, {type, line, column, used: false, isInitialized: false});
+        currentScope.set(name, symbolInfo);
+
+        this.allSymbols.push(symbolInfo);
         
         return true;
     }

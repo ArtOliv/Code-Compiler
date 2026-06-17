@@ -50,8 +50,22 @@ if(parser.errors.length > 0){
 // Semantic analysis
 console.log("\n====== Semantic Analysis ======\n");
 
+if(parser.symbolTable.allSymbols.length > 0){
+    const tableData = parser.symbolTable.allSymbols.map(sym => ({
+        Name: sym.name,
+        Type: sym.type,
+        Scope: sym.scopeLevel === 0 ? "Global" : `Local (${sym.scopeLevel})`,
+        Line: sym.line,
+        Column: sym.column,
+        Initialized: sym.isInitialized ? "Yes" : "No",
+        Used: sym.used ? "Yes" : "No"
+    }));
+    
+    console.table(tableData);
+}
+
 if(parser.warnings.length > 0){
-    console.log("Warnings:");
+    console.log("\nWarnings:");
 
     for(const warning of parser.warnings){
         console.log(`\x1b[33m- ${warning}\x1b[0m`);

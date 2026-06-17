@@ -76,6 +76,7 @@ export class Parser{
         if(expected === "error" || actual === "error") return;
         if(expected === actual) return;
         if(expected === "float" && actual === "int") return;
+        if(expected === "char" && actual === "int") return;
         
         this.semanticErrors.push(`Semantic Error (Line ${line}, Column ${column}): Incompatible types. Cannot assign '${actual}' to '${expected}'.`);
     }
@@ -83,11 +84,12 @@ export class Parser{
     checkOperationCompatibility(leftType, rightType, operator, line, column) {
         if(leftType === "error" || rightType === "error") return "error";
         
-        if(leftType === "string" || rightType === "string" || leftType === "char" || rightType === "char"){
+        if(leftType === "string" || rightType === "string"){
             this.semanticErrors.push(`Semantic Error (Line ${line}, Column ${column}): Operator '${operator}' cannot be applied to types '${leftType}' and '${rightType}'.`);
             return "error";
         }
-
+        
+        if(leftType === "char" || rightType === "char") return "char";
         if(leftType === "float" || rightType === "float") return "float";
         
         return "int";
@@ -349,7 +351,7 @@ export class Parser{
             const operator = this.advance();
             const right = this.arithmeticExpression();
 
-            const node = new Node("RalationalOperation", operator.value, "int");
+            const node = new Node("RelationalOperation", operator.value, "int");
 
             // Semantic: check operation compatibility 
             this.checkOperationCompatibility(left.evalType, right.evalType, operator.value, operator.line, operator.column);
