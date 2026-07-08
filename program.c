@@ -6,8 +6,8 @@ int main(){
 
     letter = 'b' + 1;
     letter = 'b' + num;
-    decimal = num + decimal;
-    num = x + 1;
+    num = num + decimal;
+    num = y + 1;
 
     /* Teste */
     if(num == 10){
@@ -15,6 +15,8 @@ int main(){
         num = 10 + 1 * 2;
         num = num + 10;
     }
+
+    num2 = 1 + 1;
 
     return 0;
 }

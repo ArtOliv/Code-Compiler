@@ -89,8 +89,8 @@ export class Parser{
             return "error";
         }
         
-        if(leftType === "char" || rightType === "char") return "char";
         if(leftType === "float" || rightType === "float") return "float";
+        if(leftType === "char" || rightType === "char") return "char";
         
         return "int";
     }
