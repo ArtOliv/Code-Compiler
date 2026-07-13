@@ -1,0 +1,402 @@
+# Code Generator
+
+**Languages:** [Portuguese](generator.md) | [English](generator.en.md)
+
+---
+
+## Overview
+
+The code generator is responsible for traversing the structures recognized by the Parser and producing equivalent MIPS Assembly code for the program written in C.
+
+During syntactic analysis, whenever a declaration, assignment, expression, or control structure is recognized, Assembly instructions are emitted and stored in a list, which is later used to generate the final program.
+
+Example:
+
+### Input
+
+```c
+int x = 10;
+```
+
+### Output
+
+```assembly
+.data
+x: .word 0
+
+.text
+main:
+    li $t0, 10
+    sw $t0, x
+```
+
+---
+
+## How it works
+
+Code generation is performed during AST construction by the Parser.
+
+Each grammar rule is responsible for both building its corresponding AST node and emitting the equivalent Assembly instructions.
+
+The main components used are:
+
+- Instruction List
+- Register Allocator
+- Label Generator
+- Data Section (.data)
+
+At the end of compilation, all emitted instructions are organized into the `.data` and `.text` sections, producing the complete Assembly program.
+
+---
+
+## Components
+
+### Instruction
+
+Each Assembly instruction is represented by an object containing:
+
+- Opcode
+- Operands
+
+Example:
+
+```text
+Instruction
+├── opcode: add
+└── operands:
+    ├── $t2
+    ├── $t0
+    └── $t1
+```
+
+---
+
+### Register Allocator
+
+The register allocator automatically manages which temporary registers are available during code generation.
+
+Currently, the following registers are used:
+
+Integer registers
+
+```
+$t0 ... $t9
+```
+
+Floating-point registers
+
+```
+$f0 ... $f18
+```
+
+Whenever an expression requires a register, one is allocated.
+
+Once the value stored in that register is no longer needed, the register is returned to the pool of available registers.
+
+---
+
+### Label Generator
+
+Control structures require unique labels.
+
+The Label Generator automatically creates identifiers such as:
+
+```
+ELSE0
+ENDIF1
+WHILE2
+ENDWHILE3
+FOR4
+ENDFOR5
+```
+
+These labels are used to implement conditional branches and loops.
+
+---
+
+## Code generation
+
+The compiler generates code for the following language constructs.
+
+### Declarations
+
+Input
+
+```c
+int x;
+float y;
+char c;
+```
+
+Output
+
+```assembly
+.data
+x: .word 0
+y: .float 0.0
+c: .word 0
+```
+
+---
+
+### Assignments
+
+Input
+
+```c
+x = 10;
+```
+
+Output
+
+```assembly
+li $t0, 10
+sw $t0, x
+```
+
+---
+
+### Arithmetic expressions
+
+Input
+
+```c
+x = a + b * 2;
+```
+
+Output
+
+```assembly
+lw $t0, a
+lw $t1, b
+li $t2, 2
+mul $t3, $t1, $t2
+add $t4, $t0, $t3
+sw $t4, x
+```
+
+Operator precedence is preserved by the grammar structure implemented in the Parser.
+
+---
+
+### Relational expressions
+
+Input
+
+```c
+x == 10
+```
+
+Output
+
+```assembly
+lw $t0, x
+li $t1, 10
+seq $t2, $t0, $t1
+```
+
+The following relational operators are supported:
+
+```
+==
+!=
+<
+>
+<=
+>=
+```
+
+---
+
+### If statement
+
+Input
+
+```c
+if(x == 10){
+    x = 0;
+}
+```
+
+Output
+
+```assembly
+lw $t0, x
+li $t1, 10
+seq $t2, $t0, $t1
+beq $t2, $zero, ELSE0
+
+li $t3, 0
+sw $t3, x
+
+j ENDIF1
+
+ELSE0:
+
+ENDIF1:
+```
+
+---
+
+### While loop
+
+Input
+
+```c
+while(x < 10){
+    x = x + 1;
+}
+```
+
+Output
+
+```assembly
+WHILE0:
+
+lw $t0, x
+li $t1, 10
+slt $t2, $t0, $t1
+beq $t2, $zero, ENDWHILE1
+
+lw $t3, x
+li $t4, 1
+add $t5, $t3, $t4
+sw $t5, x
+
+j WHILE0
+
+ENDWHILE1:
+```
+
+---
+
+### For loop
+
+Input
+
+```c
+for(i = 0; i < 10; i = i + 1){
+}
+```
+
+Output
+
+```assembly
+li $t0, 0
+sw $t0, i
+
+FOR0:
+
+lw $t1, i
+li $t2, 10
+slt $t3, $t1, $t2
+beq $t3, $zero, ENDFOR1
+
+lw $t4, i
+li $t5, 1
+add $t6, $t4, $t5
+sw $t6, i
+
+j FOR0
+
+ENDFOR1:
+```
+
+---
+
+### Return
+
+Input
+
+```c
+return 0;
+```
+
+Output
+
+```assembly
+li $t0, 0
+move $v0, $t0
+```
+
+At the end of the program, the compiler automatically generates:
+
+```assembly
+li $v0, 10
+syscall
+```
+
+---
+
+## Generated code organization
+
+The Assembly code is divided into two sections.
+
+### Data section
+
+Responsible for storing global variables.
+
+```assembly
+.data
+num: .word 0
+decimal: .float 0.0
+letter: .word 0
+```
+
+---
+
+### Text section
+
+Contains the executable instructions of the program.
+
+```assembly
+.text
+main:
+
+    ...
+
+    li $v0, 10
+    syscall
+```
+
+---
+
+## Code generation workflow
+
+During AST construction, the compiler performs the following sequence:
+
+1. Recognizes a language construct.
+2. Creates the corresponding AST node.
+3. Allocates temporary registers when necessary.
+4. Emits the corresponding Assembly instructions.
+5. Releases registers that are no longer needed.
+6. Generates labels for control structures.
+7. Stores all emitted instructions.
+8. Organizes the generated code into the `.data` and `.text` sections.
+
+---
+
+## How to test
+
+Clone the repository at this stage:
+
+```bash
+git clone --branch Generator https://github.com/ArtOliv/Code-Compiler.git
+cd Code-Compiler
+```
+
+Modify the `program.c` file as desired and run:
+
+```bash
+node index.js program.c
+```
+
+The output will display:
+
+- Tokens generated by the Scanner;
+- Recovered syntactic errors (if any);
+- Generated Symbol Table;
+- Warnings produced by semantic analysis;
+- Semantic errors;
+- AST generated by the Parser;
+- Generated MIPS Assembly code.

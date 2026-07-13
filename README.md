@@ -16,7 +16,6 @@ O objetivo deste projeto é implementar um compilador completo, cobrindo:
 * Análise sintática
 * Análise semântica
 * Geração de código
-* Otimizador
 
 ---
 
@@ -25,7 +24,7 @@ O objetivo deste projeto é implementar um compilador completo, cobrindo:
 O compilador segue a pipeline clássica:
 
 ```
-Código fonte -> Scanner -> Parser -> Semântica -> Gerador de Código -> Otimizador -> Código de Máquina
+Código fonte -> Scanner -> Parser -> Semântica -> Gerador de Código -> Código de Máquina
 ```
 
 ---
@@ -34,7 +33,6 @@ Código fonte -> Scanner -> Parser -> Semântica -> Gerador de Código -> Otimiz
 
 ```
 Code-Compiler/
-|
 ├── Lexical_analyzer/
 │   ├── Scanner.js
 │   └── Token.js
@@ -42,8 +40,17 @@ Code-Compiler/
 │   ├── Parser.js
 │   ├── Printer.js
 │   └── Node.js
+├── Semantic_analyzer/
+│   └── SymbolTable.js
+├── Code_generator/
+│   ├── CodeGenerator.js
+│   ├── Instructions.js
+│   ├── LabelGenerator.js
+│   └── RegisterAllocator.js
 ├── Docs/
-│   ├── parser.js
+│   ├── parser.md
+│   ├── semantic.md
+│   ├── generator.md
 │   └── scanner.md
 ├── index.js
 ├── program.c
@@ -58,6 +65,8 @@ A documentação detalhada de cada etapa do compilador está disponível na past
 
 * [Scanner (Analisador Léxico)](Docs/scanner.md)
 * [Parser (Analisador Sintático)](Docs/parser.md)
+* [Analisador Semântico](Docs/semantic.md)
+* [Gerador de código](Docs/generator.md)
 
 ---
 

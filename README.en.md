@@ -16,7 +16,6 @@ The goal of this project is to implement a complete compiler, covering:
 * Syntax Analysis
 * Semantic Analysis
 * Code Generation
-* Optimization
 
 ---
 
@@ -25,7 +24,7 @@ The goal of this project is to implement a complete compiler, covering:
 The compiler follows the classic pipeline:
 
 ```
-Source Code -> Scanner -> Parser -> Semantic Analysis -> Code Generator -> Optimizer -> Machine Code
+Source Code -> Scanner -> Parser -> Semantic Analysis -> Code Generator -> Machine Code
 ```
 
 ---
@@ -34,15 +33,27 @@ Source Code -> Scanner -> Parser -> Semantic Analysis -> Code Generator -> Optim
 
 ```
 Code-Compiler/
-|
 ├── Lexical_analyzer/
 │   ├── Scanner.js
 │   └── Token.js
+├── Syntactic_analyzer/
+│   ├── Parser.js
+│   ├── Printer.js
+│   └── Node.js
+├── Semantic_analyzer/
+│   └── SymbolTable.js
+├── Code_generator/
+│   ├── CodeGenerator.js
+│   ├── Instructions.js
+│   ├── LabelGenerator.js
+│   └── RegisterAllocator.js
 ├── Docs/
+│   ├── parser.md
+│   ├── semantic.md
+│   ├── generator.md
 │   └── scanner.md
 ├── index.js
 ├── program.c
-├── Makefile
 └── README.md
 ```
 
@@ -50,9 +61,12 @@ Code-Compiler/
 
 ## Documentation
 
-Detailed documentation for each stage of the compiler is available in the `docs/` directory:
+Detailed documentation for each stage of the compiler is available in the `Docs/` directory:
 
-* [Scanner (Lexical Analyzer)](docs/scanner.md)
+* [Scanner (Lexical Analyzer)](Docs/scanner.en.md)
+* [Parser (Syntactic Analyzer)](Docs/parser.en.md)
+* [Semantic Analyzer](Docs/semantic.en.md)
+* [Code Generator](Docs/generator.en.md)
 
 ---
 

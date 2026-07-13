@@ -88,3 +88,6 @@ if(parser.semanticErrors.length > 0){
 
 console.log("\n====== Syntactic Tree ======\n")
 Printer.print(ast);
+
+console.log("\n====== Generated Assembly Code ======\n");
+console.log(parser.generator.getCode());

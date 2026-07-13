@@ -1,6 +1,7 @@
 import { tokenType } from "../Lexical_analyzer/Token.js";
 import { Node } from "./Node.js";
 import { SymbolTable } from "../Semantic_analyzer/SymbolTable.js";
+import { CodeGenerator } from "../Code_Generator/CodeGenerator.js";
 
 export class Parser{
     constructor(tokens){
@@ -10,6 +11,7 @@ export class Parser{
         this.symbolTable = new SymbolTable();
         this.semanticErrors = [];
         this.warnings = [];
+        this.generator = new CodeGenerator();
     }
 
     // Auxiliary Methods
@@ -114,6 +116,8 @@ export class Parser{
 
             this.checkUnusedVariables(this.symbolTable.exitScope()); // Check unused variables on global scope
 
+            this.generator.finish();
+
             return ast;
         } catch(error){
             this.errors.push(error.message);
@@ -211,6 +215,8 @@ export class Parser{
                 this.semanticErrors.push(`Semantic Error (Line ${idToken.line}, Column ${idToken.column}): Redeclaration of variable '${idToken.value}'.`);
             }
 
+            this.generator.declareVariable(idToken.value, declaredType);
+
             // Check if there is declaration on the assingment
             if(this.match(tokenType.ASSIGN)){
                 // Semantic: variable assigned with value, then initialized
@@ -224,6 +230,11 @@ export class Parser{
 
                 // Semantic: check type conpatibility
                 this.checkTypeCompatibility(declaredType, exprNode.evalType, idToken.line, idToken.column);
+
+                if(exprNode.register !== undefined){
+                    this.generator.storeVariable(idToken.value, exprNode.register, declaredType);
+                    this.generator.registers.free(exprNode.register);
+                }
 
                 varNode.addChild(assignNode);
             }
@@ -258,6 +269,11 @@ export class Parser{
         
         // Semantic: check type conpatibility on assigment
         this.checkTypeCompatibility(expectedType, exprNode.evalType, idToken.line, idToken.column);
+        
+        if(exprNode.register !== undefined){
+            this.generator.storeVariable(idToken.value, exprNode.register, expectedType);
+            this.generator.registers.free(exprNode.register);
+        }
 
         return node;
     }
@@ -266,10 +282,20 @@ export class Parser{
         const node = new Node("ifCommand");
         this.consume(tokenType.LPAREN, "Expected '('");
 
-        node.addChild(this.relationalExpression());
+        const condition = this.relationalExpression();
+
+        node.addChild(condition);
         this.consume(tokenType.RPAREN, "Expected ')'");
 
+        const elseLabel = this.generator.labels.generate("ELSE");
+        const endLabel = this.generator.labels.generate("ENDIF");
+        this.generator.beq(condition.register, "$zero", elseLabel);
+        this.generator.registers.free(condition.register);
+
         node.addChild(this.block());
+
+        this.generator.jump(endLabel);
+        this.generator.label(elseLabel);
 
         if(this.match(tokenType.ELSE)){
             const elseNode = new Node("elseCommand");
@@ -277,17 +303,32 @@ export class Parser{
             node.addChild(elseNode);
         }
 
+        this.generator.label(endLabel);
+
         return node;
     }
 
     whileStatement(){
         const node = new Node("whileCommand");
+
+        const beginLabel = this.generator.labels.generate("WHILE");
+        const endLabel = this.generator.labels.generate("ENDWHILE");
+        this.generator.label(beginLabel);
+
         this.consume(tokenType.LPAREN, "Expected '('");
 
-        node.addChild(this.relationalExpression());
+        const condition = this.relationalExpression();
+
+        node.addChild(condition);
         this.consume(tokenType.RPAREN, "Expected ')'");
 
+        this.generator.beq(condition.register, "$zero", endLabel);
+        this.generator.registers.free(condition.register);
+
         node.addChild(this.block());
+
+        this.generator.jump(beginLabel);
+        this.generator.label(endLabel);
 
         return node;
     }
@@ -311,23 +352,43 @@ export class Parser{
             this.consume(tokenType.SEMICOLON, "Expected ';'");
         }
 
+        const startLabel = this.generator.labels.generate("FOR");
+        const endLabel = this.generator.labels.generate("ENDFOR");
+
+        this.generator.label(startLabel);
+
         // Condition
         if(this.match(tokenType.SEMICOLON)){
             node.addChild(new Node("Null"));
         } else {
-            node.addChild(this.relationalExpression());
+            const condition = this.relationalExpression();
+            node.addChild(condition);
             this.consume(tokenType.SEMICOLON, "Expected ';'");
+            this.generator.beq(condition.register, "$zero", endLabel);
+            this.generator.registers.free(condition.register);
         }
 
         // Iteration
+        let iterationCode = [];
+
         if(this.match(tokenType.RPAREN)){
             node.addChild(new Node("Null"));
         } else {
-            node.addChild(this.assignment());
+            this.generator.beginBuffer();
+            const iteration = this.assignment();
+            iterationCode = this.generator.endBuffer();
+            node.addChild(iteration);
             this.consume(tokenType.RPAREN, "Expected ')'");
         }
 
         node.addChild(this.block());
+
+        for(const inst of iterationCode){
+            this.generator.instructions.push(inst);
+        }
+
+        this.generator.jump(startLabel);
+        this.generator.label(endLabel);
 
         const removedScope = this.symbolTable.exitScope(); //Semantic: exit scope
         this.checkUnusedVariables(removedScope); // Semantic: check warnings
@@ -337,9 +398,15 @@ export class Parser{
 
     returnStatement(){
         const node = new Node("returnCommand");
+        const expr = this.relationalExpression();
 
-        node.addChild(this.relationalExpression());
+        node.addChild(expr);
         this.consume(tokenType.SEMICOLON, "Expected ';'");
+
+        if(expr.register !== undefined){
+            this.generator.emit("move", "$v0", expr.register);
+            this.generator.registers.free(expr.register);
+        }
         
         return node;
     }
@@ -359,6 +426,97 @@ export class Parser{
             node.addChild(left);
             node.addChild(right);
 
+            if(left.register !== undefined && right.register !== undefined){
+                if(left.evalType === "float" || right.evalType === "float"){
+                    const result = this.generator.registers.allocate();
+
+                    switch(operator.type){
+                        case tokenType.EQ:
+                            this.generator.emit("c.eq.s", left.register, right.register);
+                            break;
+
+                        case tokenType.NE:
+                            this.generator.emit("c.eq.s", left.register, right.register);
+                            break;
+
+                        case tokenType.LT:
+                            this.generator.emit("c.lt.s", left.register, right.register);
+                            break;
+
+                        case tokenType.LE:
+                            this.generator.emit("c.le.s", left.register, right.register);
+                            break;
+
+                        case tokenType.GT:
+                            this.generator.emit("c.le.s", left.register, right.register);
+                            break;
+
+                        case tokenType.GE:
+                            this.generator.emit("c.lt.s", left.register, right.register);
+                            break;
+                    }
+
+                    this.generator.emit("li", result, 1);
+
+                    const end = this.generator.labels.generate("CMP");
+
+                    switch(operator.type){
+                        case tokenType.NE:
+                            this.generator.emit("bc1f", end);
+                            break;
+
+                        case tokenType.GT:
+                            this.generator.emit("bc1f", end);
+                            break;
+
+                        case tokenType.GE:
+                            this.generator.emit("bc1f", end);
+                            break;
+
+                        default:
+                            this.generator.emit("bc1t", end);
+                    }
+
+                    this.generator.emit("li", result, 0);
+                    this.generator.label(end);
+
+                    node.register = result;
+                } else {
+                    const result = this.generator.registers.allocate();
+
+                    switch(operator.type){
+                        case tokenType.EQ:
+                            this.generator.emit("seq", result, left.register, right.register);
+                            break;
+
+                        case tokenType.NE:
+                            this.generator.emit("sne", result, left.register, right.register);
+                            break;
+
+                        case tokenType.LT:
+                            this.generator.emit("slt", result, left.register, right.register);
+                            break;
+
+                        case tokenType.GT:
+                            this.generator.emit("sgt", result, left.register, right.register);
+                            break;
+
+                        case tokenType.LE:
+                            this.generator.emit("sle", result, left.register, right.register);
+                            break;
+
+                        case tokenType.GE:
+                            this.generator.emit("sge", result, left.register, right.register);
+                            break;
+                    }
+                    
+                    node.register = result;
+                }
+                
+                this.generator.registers.free(left.register);
+                this.generator.registers.free(right.register);
+            }
+            
             return node;
         }
 
@@ -379,6 +537,18 @@ export class Parser{
             
             node.addChild(left);
             node.addChild(right);
+
+            if(left.register !== undefined && right.register !== undefined){
+                if(operator.type === tokenType.PLUS){
+                    node.register = this.generator.add(left.register, right.register, resultingType);
+                } else {
+                    node.register = this.generator.sub(left.register, right.register, resultingType);
+                }
+
+                this.generator.registers.free(left.register);
+                this.generator.registers.free(right.register);
+            }
+            
             left = node;
         }
 
@@ -399,6 +569,18 @@ export class Parser{
 
             node.addChild(left);
             node.addChild(right);
+
+            if(left.register !== undefined && right.register !== undefined){
+                if(operator.type === tokenType.MULT){
+                    node.register = this.generator.mul(left.register, right.register, resultingType);
+                } else {
+                    node.register = this.generator.div(left.register, right.register, resultingType);
+                }
+
+                this.generator.registers.free(left.register);
+                this.generator.registers.free(right.register);
+            }
+
             left = node;
         }
 
@@ -429,14 +611,50 @@ export class Parser{
                 this.warnings.push(`Warning (Line ${token.line}, Column ${token.column}): Variable '${token.value}' is used uninitialized.`);
             }
 
-            return new Node("Identifier", token.value, symbol.type);
+            const node = new Node("Identifier", token.value, symbol.type);
+
+            node.register = this.generator.loadVariable(token.value, symbol.type);
+
+            return node;
         }
 
         // Semantic: define literal type based on token
-        if(this.check(tokenType.LITER_INT)) return new Node("Literal", this.advance().value, "int");
-        if(this.check(tokenType.LITER_FLOAT)) return new Node("Literal", this.advance().value, "float");
-        if(this.check(tokenType.LITER_CHAR)) return new Node("Literal", this.advance().value, "char");
-        if(this.check(tokenType.LITER_STRING)) return new Node("Literal", this.advance().value, "string");
+        if(this.check(tokenType.LITER_INT)){
+            const token = this.advance();
+            const node = new Node("Literal", token.value, "int");
+
+            node.register = this.generator.loadImmediate(token.value);
+
+            return node;
+        }
+
+        if(this.check(tokenType.LITER_FLOAT)){
+            const token = this.advance();
+            const node = new Node("Literal", token.value, "float");
+
+            node.register = this.generator.loadImmediate(token.value, "float");
+
+            return node;
+        }
+
+        if(this.check(tokenType.LITER_CHAR)){
+            const token = this.advance();
+            const value = token.value.charCodeAt(1);
+            const node = new Node("Literal", value, "char");
+
+            node.register = this.generator.loadImmediate(value);
+
+            return node;
+        }
+        
+        if(this.check(tokenType.LITER_STRING)){
+            const token = this.advance();
+            const node = new Node("Literal", token.value, "string");
+
+            node.register = this.generator.loadImmediate(token.value);
+
+            return node;
+        }
 
         const token = this.peek();
         throw new Error(`Expected expression '${token.value}' at line ${token.line}`);
